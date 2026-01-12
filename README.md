@@ -55,13 +55,13 @@ agent-browser find role button click --name "Submit"
 ### Core Commands
 
 ```bash
-agent-browser open <url>              # Navigate to URL
+agent-browser open <url>              # Navigate to URL (aliases: goto, navigate)
 agent-browser click <sel>             # Click element
 agent-browser dblclick <sel>          # Double-click element
 agent-browser focus <sel>             # Focus element
 agent-browser type <sel> <text>       # Type into element
 agent-browser fill <sel> <text>       # Clear and fill
-agent-browser press <key>             # Press key (Enter, Tab, Control+a)
+agent-browser press <key>             # Press key (Enter, Tab, Control+a) (alias: key)
 agent-browser keydown <key>           # Hold key down
 agent-browser keyup <key>             # Release key
 agent-browser hover <sel>             # Hover element
@@ -69,14 +69,14 @@ agent-browser select <sel> <val>      # Select dropdown option
 agent-browser check <sel>             # Check checkbox
 agent-browser uncheck <sel>           # Uncheck checkbox
 agent-browser scroll <dir> [px]       # Scroll (up/down/left/right)
-agent-browser scrollintoview <sel>    # Scroll element into view
+agent-browser scrollintoview <sel>    # Scroll element into view (alias: scrollinto)
 agent-browser drag <src> <tgt>        # Drag and drop
 agent-browser upload <sel> <files>    # Upload files
 agent-browser screenshot [path]       # Take screenshot (--full for full page)
 agent-browser pdf <path>              # Save as PDF
 agent-browser snapshot                # Accessibility tree with refs (best for AI)
 agent-browser eval <js>               # Run JavaScript
-agent-browser close                   # Close browser
+agent-browser close                   # Close browser (aliases: quit, exit)
 ```
 
 ### Get Info
@@ -129,15 +129,9 @@ agent-browser find nth 2 "a" text
 ### Wait
 
 ```bash
-agent-browser wait <selector>         # Wait for element
-agent-browser wait <ms>               # Wait for time
-agent-browser wait --text "Welcome"   # Wait for text
-agent-browser wait --url "**/dash"    # Wait for URL pattern
-agent-browser wait --load networkidle # Wait for load state
-agent-browser wait --fn "window.ready === true"  # Wait for JS condition
+agent-browser wait <selector>         # Wait for element to be visible
+agent-browser wait <ms>               # Wait for time (milliseconds)
 ```
-
-**Load states:** `load`, `domcontentloaded`, `networkidle`
 
 ### Mouse Control
 
@@ -253,6 +247,10 @@ AGENT_BROWSER_SESSION=agent1 agent-browser click "#btn"
 
 # List active sessions
 agent-browser session list
+# Output:
+# Active sessions:
+# -> default
+#    agent1
 
 # Show current session
 agent-browser session
@@ -393,15 +391,17 @@ agent-browser uses a client-daemon architecture:
 
 The daemon starts automatically on first command and persists between commands for fast subsequent operations.
 
+**Browser Engine:** Uses Chromium by default. The daemon also supports Firefox and WebKit via the Playwright protocol.
+
 ## Platforms
 
 | Platform | Binary | Fallback |
 |----------|--------|----------|
-| macOS ARM64 | ✅ Native Rust | Node.js |
-| macOS x64 | ✅ Native Rust | Node.js |
-| Linux ARM64 | ✅ Native Rust | Node.js |
-| Linux x64 | ✅ Native Rust | Node.js |
-| Windows | - | Node.js |
+| macOS ARM64 | Native Rust | Node.js |
+| macOS x64 | Native Rust | Node.js |
+| Linux ARM64 | Native Rust | Node.js |
+| Linux x64 | Native Rust | Node.js |
+| Windows x64 | Native Rust | Node.js |
 
 ## Usage with AI Agents
 
