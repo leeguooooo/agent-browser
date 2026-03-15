@@ -26,7 +26,7 @@ use super::screenshot::{self, ScreenshotOptions};
 use super::snapshot::{self, SnapshotOptions};
 use super::state;
 use super::storage;
-use super::stream;
+use super::stream::{self, StreamServer};
 use super::tracing::{self as native_tracing, TracingState};
 use super::webdriver::appium::AppiumManager;
 use super::webdriver::backend::{BrowserBackend, WebDriverBackend, WEBDRIVER_UNSUPPORTED_ACTIONS};
@@ -108,6 +108,8 @@ pub struct DaemonState {
     pub active_frame_id: Option<String>,
     /// Shared slot for stream server to receive CDP client when browser launches.
     pub stream_client: Option<Arc<RwLock<Option<Arc<CdpClient>>>>>,
+    /// Stream server instance kept alive so the broadcast channel remains open.
+    pub stream_server: Option<Arc<StreamServer>>,
 }
 
 impl DaemonState {
@@ -141,15 +143,19 @@ impl DaemonState {
             request_tracking: false,
             active_frame_id: None,
             stream_client: None,
+            stream_server: None,
         }
     }
 
-    /// Create state with an optional stream client slot (for daemon startup with stream server).
-    pub fn new_with_stream_client(
+    /// Create state with an optional stream client slot and server instance
+    /// (for daemon startup with stream server).
+    pub fn new_with_stream(
         stream_client: Option<Arc<RwLock<Option<Arc<CdpClient>>>>>,
+        stream_server: Option<Arc<StreamServer>>,
     ) -> Self {
         let mut s = Self::new();
         s.stream_client = stream_client;
+        s.stream_server = stream_server;
         s
     }
 
@@ -164,6 +170,21 @@ impl DaemonState {
         if let Some(ref slot) = self.stream_client {
             let mut guard = slot.write().await;
             *guard = self.browser.as_ref().map(|m| Arc::clone(&m.client));
+        }
+        if let Some(ref server) = self.stream_server {
+            // Update the CDP page session ID so screencast commands target the right page
+            let session_id = self
+                .browser
+                .as_ref()
+                .and_then(|m| m.active_session_id().ok().map(|s| s.to_string()));
+            server.set_cdp_session_id(session_id).await;
+
+            // Broadcast connection status change to WebSocket clients
+            let connected = self.browser.is_some();
+            let sc = server.is_screencasting().await;
+            server.broadcast_status(connected, sc, 1280, 720);
+            // Notify the background CDP event loop that the client changed
+            server.notify_client_changed();
         }
     }
 
@@ -372,10 +393,15 @@ impl DaemonState {
                             }
                         }
                         "Page.screencastFrame" => {
-                            if let Some(sid) =
-                                event.params.get("sessionId").and_then(|v| v.as_i64())
-                            {
-                                pending_acks.push(sid);
+                            // Frame broadcasting and acks are handled in real-time by the
+                            // stream server's background CDP event loop. Here we just
+                            // collect acks as a fallback for non-streaming mode.
+                            if self.stream_server.is_none() {
+                                if let Some(sid) =
+                                    event.params.get("sessionId").and_then(|v| v.as_i64())
+                                {
+                                    pending_acks.push(sid);
+                                }
                             }
                         }
                         "Fetch.requestPaused" => {
@@ -3305,6 +3331,10 @@ async fn handle_screencast_start(cmd: &Value, state: &mut DaemonState) -> Result
     .await?;
     state.screencasting = true;
 
+    if let Some(ref server) = state.stream_server {
+        server.broadcast_status(true, true, max_width as u32, max_height as u32);
+    }
+
     Ok(json!({ "started": true }))
 }
 
@@ -3318,6 +3348,10 @@ async fn handle_screencast_stop(state: &mut DaemonState) -> Result<Value, String
 
     stream::stop_screencast(&mgr.client, session_id).await?;
     state.screencasting = false;
+
+    if let Some(ref server) = state.stream_server {
+        server.broadcast_status(true, false, 0, 0);
+    }
 
     Ok(json!({ "stopped": true }))
 }
