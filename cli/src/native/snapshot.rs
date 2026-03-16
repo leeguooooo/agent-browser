@@ -98,6 +98,7 @@ struct TreeNode {
 struct CursorElementInfo {
     kind: String, // "clickable", "focusable", "editable"
     hints: Vec<String>,
+    text: String, // textContent from the DOM element (fallback when ARIA name is empty)
 }
 
 struct RoleNameTracker {
@@ -571,12 +572,20 @@ async fn find_cursor_interactive_elements(
             hints.push("contenteditable".to_string());
         }
 
+        let text = elem
+            .get("text")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_string();
+
         if let Some(bid) = backend_node_id {
             map.insert(
                 bid,
                 CursorElementInfo {
                     kind: kind.to_string(),
                     hints,
+                    text,
                 },
             );
         }
@@ -727,8 +736,16 @@ fn render_tree(
     let prefix = "  ".repeat(indent);
     let mut line = format!("{}- {}", prefix, role);
 
-    if !node.name.is_empty() {
-        line.push_str(&format!(" \"{}\"", node.name));
+    // Use ARIA name if available, otherwise fall back to cursor-interactive textContent
+    let display_name = if !node.name.is_empty() {
+        &node.name
+    } else if let Some(ref ci) = node.cursor_info {
+        &ci.text
+    } else {
+        &node.name
+    };
+    if !display_name.is_empty() {
+        line.push_str(&format!(" \"{}\"", display_name));
     }
 
     // Properties
