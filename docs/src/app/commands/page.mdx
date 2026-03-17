@@ -333,7 +333,6 @@ agent-browser reload                  # Reload page
 -p, --provider <name>    # Browser provider (ios, browserbase, kernel, browseruse, browserless)
 --device <name>          # iOS device name (e.g., "iPhone 15 Pro")
 --json                   # JSON output (for scripts)
---full, -f               # Full page screenshot
 --annotate               # Annotated screenshot with numbered element labels
 --screenshot-dir <path>   # Default screenshot output directory (or AGENT_BROWSER_SCREENSHOT_DIR)
 --screenshot-quality <n>  # JPEG quality 0-100 (or AGENT_BROWSER_SCREENSHOT_QUALITY)
@@ -352,6 +351,32 @@ agent-browser reload                  # Reload page
 --config <path>          # Use a custom config file
 --debug                  # Debug output
 ```
+
+## Batch execution
+
+Execute multiple commands in a single invocation by piping a JSON array of string arrays to `batch`:
+
+```bash
+echo '[
+  ["open", "https://example.com"],
+  ["snapshot", "-i"],
+  ["click", "@e1"],
+  ["screenshot", "result.png"]
+]' | agent-browser batch --json
+
+# Stop on first error
+agent-browser batch --bail < commands.json
+```
+
+<table>
+  <thead>
+    <tr><th>Option</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>--bail</code></td><td>Stop on first error (default: continue all commands)</td></tr>
+    <tr><td><code>--json</code></td><td>Output results as a JSON array</td></tr>
+  </tbody>
+</table>
 
 ## Command chaining
 
